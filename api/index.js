@@ -2,18 +2,17 @@ import { fetch } from 'undici';
 
 const GITHUB_API_URL = "https://api.github.com/graphql";
 
-// ✅ FIX: Moved discussion comments OUT of contributionsCollection
+// ✅ FIXED QUERY: Moved discussion stats OUT of contributionsCollection
 const query = `
   query UserMetrics($login: String!) {
     user(login: $login) {
       login
       name
-      avatarUrl
       contributionsCollection {
         totalCommitContributions
         totalPullRequestReviewContributions
       }
-      # Correct location for discussion comments
+      # This is the correct way to get discussion comments
       repositoryDiscussionComments {
         totalCount
       }
@@ -68,7 +67,7 @@ function mapMetrics(user) {
   const commits = user?.contributionsCollection?.totalCommitContributions ?? 0;
   const reviews = user?.contributionsCollection?.totalPullRequestReviewContributions ?? 0;
   
-  // ✅ FIX: Updated path to match the new query structure
+  // ✅ FIXED MAPPING: Reading from the new location in the data object
   const discussionComments = user?.repositoryDiscussionComments?.totalCount ?? 0;
   
   const closedIssues = user?.issues?.totalCount ?? 0;
