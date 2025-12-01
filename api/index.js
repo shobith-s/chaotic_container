@@ -13,6 +13,7 @@ const query = `
         totalCommitContributions
         totalPullRequestReviewContributions
       }
+      # Correct location for discussion comments
       repositoryDiscussionComments {
         totalCount
       }
@@ -67,7 +68,7 @@ function mapMetrics(user) {
   const commits = user?.contributionsCollection?.totalCommitContributions ?? 0;
   const reviews = user?.contributionsCollection?.totalPullRequestReviewContributions ?? 0;
   
-  // ✅ FIX: specific path for discussion comments
+  // ✅ FIX: Updated path to match the new query structure
   const discussionComments = user?.repositoryDiscussionComments?.totalCount ?? 0;
   
   const closedIssues = user?.issues?.totalCount ?? 0;
