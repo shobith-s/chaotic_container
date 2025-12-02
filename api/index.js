@@ -68,6 +68,7 @@ async function fetchGitHubData(token, username) {
 }
 
 // Seeded random number generator for consistent chaos
+// Uses Linear Congruential Generator (LCG) with Numerical Recipes constants
 function seededRandom(seed) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
@@ -76,6 +77,7 @@ function seededRandom(seed) {
     hash = hash & hash;
   }
   return function() {
+    // LCG constants from Numerical Recipes: a=1103515245, c=12345, m=2^31
     hash = (hash * 1103515245 + 12345) & 0x7fffffff;
     return (hash % 1000) / 1000;
   };
@@ -460,6 +462,24 @@ const iconDefs = `
   </symbol>
 `;
 
+// Helper to truncate strings with ellipsis
+function truncateString(str, maxLen = 12) {
+  return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+}
+
+// 3D Cuboid container dimensions
+const CUBOID = {
+  LEFT: 50,
+  RIGHT: 850,
+  TOP: 80,
+  BOTTOM: 370,
+  INNER_LEFT: 100,
+  INNER_RIGHT: 800,
+  DEPTH_OFFSET: 20,
+  GRID_COLS: 8,
+  GRID_ROWS: 5
+};
+
 function generateSVG(metrics, themeName = 'default', chaosLevel = 5) {
   const theme = themes[themeName] || themes.default;
   const random = seededRandom(metrics.username + chaosLevel);
@@ -468,8 +488,8 @@ function generateSVG(metrics, themeName = 'default', chaosLevel = 5) {
   const chaosRotation = () => (random() - 0.5) * chaosLevel * 4;
   const chaosOffset = () => (random() - 0.5) * chaosLevel * 3;
   
+  // Use system fonts with fallbacks for better SVG compatibility
   const css = `
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;family=Inter:wght@400;600;700&amp;display=swap');
     .bg { fill: url(#bgGradient); }
     .text-main { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
     .text-mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
@@ -571,7 +591,7 @@ function generateSVG(metrics, themeName = 'default', chaosLevel = 5) {
   const repoItems = metrics.topRepos.map((repo, i) => `
     <g transform="translate(10, ${40 + i * 22})">
       <use href="#icon-book" x="0" y="0" width="14" height="14" class="icon-secondary"/>
-      <text x="18" y="11" class="text-main text-primary" font-size="9">${repo.name.substring(0, 12)}${repo.name.length > 12 ? '...' : ''}</text>
+      <text x="18" y="11" class="text-main text-primary" font-size="9">${truncateString(repo.name)}</text>
       <use href="#icon-star" x="80" y="0" width="12" height="12" style="stroke: ${theme.accent2};"/>
       <text x="95" y="11" class="text-mono text-accent2" font-size="8">${repo.stars}</text>
     </g>
@@ -619,27 +639,30 @@ function generateSVG(metrics, themeName = 'default', chaosLevel = 5) {
   `;
 
   // 3D Cuboid container paths (isometric projection)
+  const gridColWidth = (CUBOID.INNER_RIGHT - CUBOID.INNER_LEFT) / CUBOID.GRID_COLS;
+  const gridRowHeight = (CUBOID.BOTTOM - CUBOID.TOP) / CUBOID.GRID_ROWS;
+  
   const cuboidPaths = `
     <!-- Back face -->
-    <path d="M 100 80 L 800 80 L 800 370 L 100 370 Z" class="cuboid-face"/>
+    <path d="M ${CUBOID.INNER_LEFT} ${CUBOID.TOP} L ${CUBOID.INNER_RIGHT} ${CUBOID.TOP} L ${CUBOID.INNER_RIGHT} ${CUBOID.BOTTOM} L ${CUBOID.INNER_LEFT} ${CUBOID.BOTTOM} Z" class="cuboid-face"/>
     <!-- Left face -->
-    <path d="M 50 100 L 100 80 L 100 370 L 50 390 Z" class="cuboid-face"/>
+    <path d="M ${CUBOID.LEFT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_LEFT} ${CUBOID.TOP} L ${CUBOID.INNER_LEFT} ${CUBOID.BOTTOM} L ${CUBOID.LEFT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} Z" class="cuboid-face"/>
     <!-- Bottom face -->
-    <path d="M 50 390 L 100 370 L 800 370 L 850 390 Z" class="cuboid-face"/>
+    <path d="M ${CUBOID.LEFT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_LEFT} ${CUBOID.BOTTOM} L ${CUBOID.INNER_RIGHT} ${CUBOID.BOTTOM} L ${CUBOID.RIGHT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} Z" class="cuboid-face"/>
     <!-- Right face -->
-    <path d="M 800 80 L 850 100 L 850 390 L 800 370 Z" class="cuboid-face"/>
+    <path d="M ${CUBOID.INNER_RIGHT} ${CUBOID.TOP} L ${CUBOID.RIGHT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} L ${CUBOID.RIGHT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_RIGHT} ${CUBOID.BOTTOM} Z" class="cuboid-face"/>
     <!-- Top face -->
-    <path d="M 50 100 L 100 80 L 800 80 L 850 100 Z" class="cuboid-face"/>
+    <path d="M ${CUBOID.LEFT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_LEFT} ${CUBOID.TOP} L ${CUBOID.INNER_RIGHT} ${CUBOID.TOP} L ${CUBOID.RIGHT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} Z" class="cuboid-face"/>
     
     <!-- Grid pattern on back face -->
-    ${Array.from({length: 8}, (_, i) => `<line x1="${100 + i * 87.5}" y1="80" x2="${100 + i * 87.5}" y2="370" class="grid-line"/>`).join('')}
-    ${Array.from({length: 5}, (_, i) => `<line x1="100" y1="${80 + i * 72.5}" x2="800" y2="${80 + i * 72.5}" class="grid-line"/>`).join('')}
+    ${Array.from({length: CUBOID.GRID_COLS}, (_, i) => `<line x1="${CUBOID.INNER_LEFT + i * gridColWidth}" y1="${CUBOID.TOP}" x2="${CUBOID.INNER_LEFT + i * gridColWidth}" y2="${CUBOID.BOTTOM}" class="grid-line"/>`).join('')}
+    ${Array.from({length: CUBOID.GRID_ROWS}, (_, i) => `<line x1="${CUBOID.INNER_LEFT}" y1="${CUBOID.TOP + i * gridRowHeight}" x2="${CUBOID.INNER_RIGHT}" y2="${CUBOID.TOP + i * gridRowHeight}" class="grid-line"/>`).join('')}
     
     <!-- Edges (glass highlight effect) -->
-    <path d="M 50 100 L 100 80 L 800 80 L 850 100" class="cuboid-edge" stroke-opacity="0.6"/>
-    <path d="M 50 100 L 50 390 L 100 370" class="cuboid-edge" stroke-opacity="0.4"/>
-    <path d="M 850 100 L 850 390 L 800 370" class="cuboid-edge" stroke-opacity="0.4"/>
-    <path d="M 50 390 L 850 390" class="cuboid-edge" stroke-opacity="0.3"/>
+    <path d="M ${CUBOID.LEFT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_LEFT} ${CUBOID.TOP} L ${CUBOID.INNER_RIGHT} ${CUBOID.TOP} L ${CUBOID.RIGHT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET}" class="cuboid-edge" stroke-opacity="0.6"/>
+    <path d="M ${CUBOID.LEFT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} L ${CUBOID.LEFT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_LEFT} ${CUBOID.BOTTOM}" class="cuboid-edge" stroke-opacity="0.4"/>
+    <path d="M ${CUBOID.RIGHT} ${CUBOID.TOP + CUBOID.DEPTH_OFFSET} L ${CUBOID.RIGHT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} L ${CUBOID.INNER_RIGHT} ${CUBOID.BOTTOM}" class="cuboid-edge" stroke-opacity="0.4"/>
+    <path d="M ${CUBOID.LEFT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET} L ${CUBOID.RIGHT} ${CUBOID.BOTTOM + CUBOID.DEPTH_OFFSET}" class="cuboid-edge" stroke-opacity="0.3"/>
   `;
 
   return `<svg width="900" height="450" viewBox="0 0 900 450" xmlns="http://www.w3.org/2000/svg">
